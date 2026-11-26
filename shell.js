@@ -42,7 +42,7 @@ function mount(r){
  html=html.replace(/<\/html>\s*$/i,injected+"</html>");
  next.srcdoc=html;frame=next;requestId++;active={version:r.version,release_number:r.release_number};pending=null;$("lab").replaceChildren(next);$("lab").hidden=false;$("login").hidden=true;$("logout").hidden=false;document.body.classList.add("active");status("גרסה "+r.version);
 }
-function clear(){epoch++;session=null;active=null;pending=null;frame=null;$("lab").replaceChildren();$("lab").hidden=true;$("login").hidden=false;$("logout").hidden=true;document.body.classList.remove("active")}
+function clear(){try{localStorage.removeItem("asv-login-pkce-v1")}catch{}epoch++;session=null;active=null;pending=null;frame=null;$("lab").replaceChildren();$("lab").hidden=true;$("login").hidden=false;$("logout").hidden=true;document.body.classList.remove("active")}
 async function poll(){
  if(!session||busy)return;busy=true;const turn=epoch;
  try{const t=await token();if(turn!==epoch)return;const rows=await api("/rest/v1/asv_releases?select=version,release_number,html&order=release_number.desc&limit=1",{token:t});if(turn!==epoch)return;
@@ -52,13 +52,34 @@ async function poll(){
  }catch(e){if(turn!==epoch)return;if(!active||e.status===401||e.status===403||session?.expires<=Date.now()){clear();status("הגישה לא אומתה. יש להתחבר מחדש.")}else status("אין חיבור לעדכונים; הגרסה הפעילה נשמרת.")}
  finally{busy=false}
 }
+const callback="https://mataniar0.github.io/asv-lab-app/";
+const verifierKey="asv-login-pkce-v1";
+const b64url=bytes=>btoa(String.fromCharCode(...bytes)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 $("login").addEventListener("submit",async e=>{
- e.preventDefault();if(busy||session)return;busy=true;const turn=++epoch;$("submit").disabled=true;const email=$("email").value.trim(),password=$("password").value;$("password").value="";status("מתחבר…");
- try{const s=await api("/auth/v1/token?grant_type=password",{method:"POST",body:{email,password}});if(turn!==epoch)return;acceptSession(s)}
- catch{if(turn===epoch){clear();status("לא ניתן להתחבר. בדוק פרטים ונסה שוב.")}}
+ e.preventDefault();if(busy||session)return;busy=true;const turn=++epoch;$("submit").disabled=true;status("שולח קישור…");
+ try{
+  const verifier=b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge=b64url(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(verifier))));
+  localStorage.setItem(verifierKey,JSON.stringify({verifier,expires:Date.now()+900000}));
+  await api("/auth/v1/otp?redirect_to="+encodeURIComponent(callback),{method:"POST",body:{email:$("email").value.trim(),create_user:false,code_challenge:challenge,code_challenge_method:"s256"}});
+  if(turn===epoch)status("אם החשבון מורשה, יישלח קישור. פתח אותו באותו דפדפן בתוך 15 דקות.");
+ }catch{try{localStorage.removeItem(verifierKey)}catch{}if(turn===epoch)status("לא ניתן לשלוח קישור כרגע. נסה שוב מאוחר יותר.")}
  finally{busy=false;$("submit").disabled=false}
- if(session)await poll()
 });
+async function completeMagicLink(){
+ const u=new URL(location.href),code=u.searchParams.get("code"),error=u.searchParams.get("error")||u.hash.includes("error=");
+ if(!code&&!error)return;
+ history.replaceState(null,"",location.pathname);busy=true;$("submit").disabled=true;
+ try{
+  const item=JSON.parse(localStorage.getItem(verifierKey)||"null");localStorage.removeItem(verifierKey);
+  if(error||!code||!item||item.expires<=Date.now()||! /^[A-Za-z0-9_-]{43}$/.test(item.verifier))throw Error("invalid callback");
+  const sessionData=await api("/auth/v1/token?grant_type=pkce",{method:"POST",body:{auth_code:code,code_verifier:item.verifier}});
+  acceptSession(sessionData);
+ }catch{clear();status("קישור לא תקף או נפתח בדפדפן אחר. בקש קישור חדש.")}
+ finally{busy=false;$("submit").disabled=false}
+ if(session)await poll();
+}
+completeMagicLink();
 $("logout").onclick=()=>{const t=session?.access;clear();status("נותקת.");if(t)api("/auth/v1/logout",{method:"POST",token:t}).catch(()=>{})};
 addEventListener("message",e=>{
  if(!frame||e.source!==frame.contentWindow||e.origin!=="null"||!e.data)return;
