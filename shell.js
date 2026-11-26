@@ -16,7 +16,7 @@ function valid(r){return r&&typeof r.html==="string"&&r.html.length>0&&r.html.le
 function childSource(){
  return function bridge(){
   const $=id=>document.getElementById(id);
-  const ids=["scene","mode","phase","spatial","balance","n","nx","ny","range","hf","vf","fps","yaw","pitch","shift","rawHz","low","high"];
+  const ids=["geometry","planeW","planeH","planeD","scene","mode","phase","spatial","balance","n","nx","ny","range","hf","vf","fps","yaw","pitch","shift","rawHz","low","high"];
   let last=0,locked=false;
   for(const id of ["play","single","testAudio","testMedia"])$(id)?.addEventListener("click",()=>{last=Date.now()},true);
   const send=(type,extra={})=>parent.postMessage({type,...extra},"*");

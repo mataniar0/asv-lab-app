@@ -1,4 +1,4 @@
-const CACHE="asv-public-shell-8", FILES=["./","./index.html","./style.css","./shell.js","./manifest.webmanifest","./icon-192.png","./icon-512.png"];
+const CACHE="asv-public-shell-9", FILES=["./","./index.html","./style.css","./shell.js","./manifest.webmanifest","./icon-192.png","./icon-512.png"];
 self.addEventListener("install",e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES))));
 self.addEventListener("activate",e=>e.waitUntil((async()=>{for(const name of await caches.keys())if(name.startsWith("asv-public-shell-")&&name!==CACHE)await caches.delete(name);await self.clients.claim()})()));
 self.addEventListener("fetch",e=>{if(e.request.method!=="GET")return;const u=new URL(e.request.url);if(u.searchParams.has("code")||u.searchParams.has("token_hash")||u.searchParams.has("error"))return;const scope=new URL(self.registration.scope);if(u.origin!==scope.origin||!FILES.some(f=>new URL(f,scope).pathname===u.pathname))return;e.respondWith(fetch(e.request).catch(()=>caches.open(CACHE).then(c=>c.match(e.request))))});
