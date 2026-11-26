@@ -56,14 +56,18 @@ const callback="https://mataniar0.github.io/asv-lab-app/";
 const verifierKey="asv-login-pkce-v1";
 const b64url=bytes=>btoa(String.fromCharCode(...bytes)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
 $("login").addEventListener("submit",async e=>{
- e.preventDefault();if(busy||session)return;busy=true;const turn=++epoch;$("submit").disabled=true;status("שולח קישור…");
+ e.preventDefault();if(busy||session)return;
+ let prior=null;
+ try{prior=JSON.parse(localStorage.getItem(verifierKey)||"null")}catch{}
+ if(prior?.sentAt&&Date.now()-prior.sentAt<60000){status("כבר נשלח קישור. בדוק את הדוא״ל לפני בקשה חדשה.");return}
+ busy=true;const turn=++epoch;$("submit").disabled=true;status("שולח קישור…");
  try{
   const verifier=b64url(crypto.getRandomValues(new Uint8Array(32)));
   const challenge=b64url(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(verifier))));
-  localStorage.setItem(verifierKey,JSON.stringify({verifier,expires:Date.now()+900000}));
   await api("/auth/v1/otp?redirect_to="+encodeURIComponent(callback),{method:"POST",body:{email:$("email").value.trim(),create_user:false,code_challenge:challenge,code_challenge_method:"s256"}});
+  localStorage.setItem(verifierKey,JSON.stringify({verifier,expires:Date.now()+900000,sentAt:Date.now()}));
   if(turn===epoch)status("אם החשבון מורשה, יישלח קישור. פתח אותו באותו דפדפן בתוך 15 דקות.");
- }catch{try{localStorage.removeItem(verifierKey)}catch{}if(turn===epoch)status("לא ניתן לשלוח קישור כרגע. נסה שוב מאוחר יותר.")}
+ }catch(e){if(turn===epoch)status(e.status===429?"מגבלת שליחת דוא״ל. השתמש בקישור האחרון שקיבלת או נסה שוב לאחר דקה.":"לא ניתן לשלוח קישור כרגע. נסה שוב מאוחר יותר.")}
  finally{busy=false;$("submit").disabled=false}
 });
 async function completeMagicLink(){
