@@ -16,7 +16,7 @@ function valid(r){return r&&typeof r.html==="string"&&r.html.length>0&&r.html.le
 function childSource(){
  return function bridge(){
   const $=id=>document.getElementById(id);
-  const ids=["scene","mode","phase","spatial","n","range","hf","vf","fps","yaw","pitch","shift","low","high"];
+  const ids=["scene","mode","phase","spatial","balance","n","nx","ny","range","hf","vf","fps","yaw","pitch","shift","rawHz","low","high"];
   let last=0,locked=false;
   for(const id of ["play","single","testAudio","testMedia"])$(id)?.addEventListener("click",()=>{last=Date.now()},true);
   const send=(type,extra={})=>parent.postMessage({type,...extra},"*");
@@ -26,7 +26,7 @@ function childSource(){
   for(const id of ["install","pwaCheck","pwaStatus"]){if($(id))$(id).hidden=true}
   addEventListener("message",e=>{
     if(e.source!==parent||e.origin!==PARENT_ORIGIN||!e.data)return;
-    if(e.data.type==="asv-init"){for(const id of ids){const el=$(id),v=e.data.values?.[id];if(!el||typeof v!=="string"||v.length>40)continue;if(el.type==="range"&&Number.isFinite(Number(v)))el.value=v;else if(el.tagName==="SELECT"&&[...el.options].some(o=>o.value===v))el.value=v}if(typeof update==="function")update()}
+    if(e.data.type==="asv-init"){for(const id of ids){const el=$(id),v=e.data.values?.[id]??((id==='nx'||id==='ny')?e.data.values?.n:undefined);if(!el||typeof v!=="string"||v.length>40)continue;if(el.type==="range"&&Number.isFinite(Number(v)))el.value=v;else if(el.tagName==="SELECT"&&[...el.options].some(o=>o.value===v))el.value=v}if(typeof update==="function"){if(typeof selected!=="undefined")selected=null;update()}}
     if(e.data.type==="asv-lock"&&!locked&&$("stop")?.disabled&&Date.now()-last>3000){
       locked=true;window.stopLabAudio?.();for(const id of ["play","single","testAudio","testMedia"])if($(id))$(id).disabled=true;send("asv-locked",{id:e.data.id});
     }
