@@ -55,6 +55,18 @@ async function poll(){
 const callback="https://mataniar0.github.io/asv-lab-app/";
 const verifierKey="asv-login-pkce-v1";
 const b64url=bytes=>btoa(String.fromCharCode(...bytes)).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+$("google").onclick=async()=>{
+ if(busy||session)return;
+ busy=true;$("google").disabled=true;$("submit").disabled=true;
+ try{
+  const verifier=b64url(crypto.getRandomValues(new Uint8Array(32)));
+  const challenge=b64url(new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode(verifier))));
+  localStorage.setItem(verifierKey,JSON.stringify({verifier,expires:Date.now()+900000,sentAt:Date.now()}));
+  const u=new URL(API+"/auth/v1/authorize");
+  u.search=new URLSearchParams({provider:"google",redirect_to:callback,code_challenge:challenge,code_challenge_method:"s256",scopes:"openid email profile",prompt:"select_account"}).toString();
+  location.assign(u.href);
+ }catch{status("לא ניתן להתחיל התחברות עם Google.");busy=false;$("google").disabled=false;$("submit").disabled=false}
+};
 $("login").addEventListener("submit",async e=>{
  e.preventDefault();if(busy||session)return;
  let prior=null;
